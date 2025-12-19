@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧭 실내 네비게이션</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+        
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        h1 {
+            text-align: center;
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+        }
+        
+        /* 현재 위치 카드 */
+        .current-location {
+            background: linear-gradient(135deg, #00d4ff33, #00d4ff11);
+            border: 2px solid #00d4ff;
+            border-radius: 20px;
+            padding: 25px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .current-room {
+            font-size: 3rem;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+        
+        .current-label {
+            color: #888;
+            margin-top: 5px;
+        }
+        
+        /* 목적지 선택 */
+        .destination-section {
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .destination-section h3 {
+            margin-bottom: 15px;
+            color: #00d4ff;
+        }
+        
+        .room-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+        
+        .room-btn {
+            padding: 15px 10px;
+            border: 2px solid #333;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.05);
+            color: #fff;
+            font-size: 0.9rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .room-btn:hover {
+            border-color: #00d4ff;
+            background: rgba(0, 212, 255, 0.1);
+        }
+        
+        .room-btn.selected {
+            border-color: #00d4ff;
+            background: #00d4ff;
+            color: #000;
+        }
+        
+        .room-btn.current {
+            border-color: #2ecc71;
+            background: rgba(46, 204, 113, 0.2);
+        }
+        
+        /* 네비게이션 안내 */
+        .navigation-panel {
+            background: linear-gradient(135deg, #1a1a3e, #2a2a5e);
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            display: none;
+        }
+        
+        .navigation-panel.active {
+            display: block;
+        }
+        
+        .nav-direction {
+            font-size: 5rem;
+            margin-bottom: 10px;
+        }
+        
+        .nav-instruction {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        
+        .nav-distance {
+            font-size: 3rem;
+            color: #00d4ff;
+            font-weight: bold;
+        }
+        
+        .nav-distance-label {
+            color: #888;
+            margin-bottom: 20px;
+        }
+        
+        .progress-bar {
+            background: #333;
+            border-radius: 10px;
+            height: 20px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        
+        .progress-fill {
+            background: linear-gradient(90deg, #00d4ff, #00ff88);
+            height: 100%;
+            transition: width 0.5s;
+        }
+        
+        .nav-status {
+            padding: 10px 20px;
+            border-radius: 10px;
+            display: inline-block;
+            font-weight: bold;
+        }
+        
+        .nav-status.navigating {
+            background: #00d4ff;
+            color: #000;
+        }
+        
+        .nav-status.arrived {
+            background: #2ecc71;
+            color: #fff;
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        /* 빠른 이동 버튼 */
+        .quick-nav {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .quick-btn {
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .quick-btn.toilet { background: linear-gradient(135deg, #9b59b6, #8e44ad); color: #fff; }
+        .quick-btn.stair { background: linear-gradient(135deg, #e74c3c, #c0392b); color: #fff; }
+        .quick-btn.elevator { background: linear-gradient(135deg, #3498db, #2980b9); color: #fff; }
+        .quick-btn.exit { background: linear-gradient(135deg, #f39c12, #d68910); color: #fff; }
+        
+        /* 취소 버튼 */
+        .cancel-btn {
+            width: 100%;
+            padding: 15px;
+            margin-top: 15px;
+            background: #ff4757;
+            border: none;
+            border-radius: 12px;
+            color: #fff;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        /* 복도 미니맵 */
+        .minimap {
+            background: #0a0a15;
+            border-radius: 15px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+        
+        .minimap-track {
+            position: relative;
+            height: 40px;
+            background: #1a1a2e;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        
+        .minimap-current {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background: #00d4ff;
+            border-radius: 50%;
+            top: 12px;
+            transform: translateX(-50%);
+            box-shadow: 0 0 15px #00d4ff;
+            transition: left 0.5s;
+        }
+        
+        .minimap-dest {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background: #ff4757;
+            border-radius: 50%;
+            top: 12px;
+            transform: translateX(-50%);
+            transition: left 0.5s;
+        }
+        
+        .minimap-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.7rem;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧭 실내 네비게이션</h1>
+        
+        <!-- 현재 위치 -->
+        <div class="current-location">
+            <div class="current-room" id="currentRoom">7413</div>
+            <div class="current-label">📍 현재 위치</div>
+        </div>
+        
+        <!-- 목적지 선택 (네비게이션 안할 때) -->
+        <div class="destination-section" id="destSection">
+            <h3>🎯 목적지를 선택하세요</h3>
+            <div class="room-grid" id="roomGrid">
+                <!-- JS로 생성 -->
+            </div>
+            
+            <h3 style="margin-top:20px;">⚡ 빠른 이동</h3>
+            <div class="quick-nav">
+                <button class="quick-btn toilet" onclick="navigateTo('WC')">🚻 화장실</button>
+                <button class="quick-btn stair" onclick="navigateTo('STAIR')">🚪 계단</button>
+                <button class="quick-btn elevator" onclick="navigateTo('EV')">🛗 엘리베이터</button>
+                <button class="quick-btn exit" onclick="navigateTo('EXIT')">🚨 비상구</button>
+            </div>
+        </div>
+        
+        <!-- 네비게이션 패널 -->
+        <div class="navigation-panel" id="navPanel">
+            <div class="nav-direction" id="navDirection">➡️</div>
+            <div class="nav-instruction" id="navInstruction">직진하세요</div>
+            
+            <div class="nav-distance" id="navDistance">35.0</div>
+            <div class="nav-distance-label">미터 남음</div>
+            
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+            </div>
+            
+            <div class="nav-status navigating" id="navStatus">🚶 이동 중...</div>
+            
+            <!-- 미니맵 -->
+            <div class="minimap">
+                <div class="minimap-labels">
+                    <span>7414</span>
+                    <span>7413</span>
+                    <span>7411</span>
+                    <span>7408</span>
+                    <span>7405</span>
+                    <span>7401</span>
+                </div>
+                <div class="minimap-track">
+                    <div class="minimap-current" id="minimapCurrent"></div>
+                    <div class="minimap-dest" id="minimapDest"></div>
+                </div>
+            </div>
+            
+            <button class="cancel-btn" onclick="cancelNavigation()">❌ 안내 종료</button>
+        </div>
+    </div>
+    
+    <script>
+        // 호실 위치 (7413 = 0m)
+        const ROOMS = {
+            "7414": -5.0,
+            "7413": 0.0,
+            "7412": 15.0,
+            "7411": 20.0,
+            "7410": 25.0,
+            "7409": 30.0,
+            "7408": 35.0,
+            "7407": 40.0,
+            "7406": 45.0,
+            "7405": 50.0,
+            "7404": 55.0,
+            "7403": 60.0,
+            "7401": 65.0,
+        };
+        
+        // 시설 위치
+        const FACILITIES = {
+            "WC": 8.0,      // 화장실 (7413 왼쪽)
+            "EV": 11.0,     // 엘리베이터
+            "STAIR": 5.0,   // 계단
+            "EXIT": 5.0,    // 비상구 = 계단
+        };
+        
+        let currentPosition = 0;
+        let currentRoom = "7413";
+        let destination = null;
+        let destPosition = null;
+        let isNavigating = false;
+        let startPosition = 0;
+        
+        // 호실 버튼 생성
+        function createRoomButtons() {
+            const grid = document.getElementById('roomGrid');
+            grid.innerHTML = '';
+            
+            Object.keys(ROOMS).forEach(room => {
+                const btn = document.createElement('button');
+                btn.className = 'room-btn';
+                btn.textContent = room;
+                btn.onclick = () => navigateTo(room);
+                
+                if (room === currentRoom) {
+                    btn.classList.add('current');
+                }
+                
+                grid.appendChild(btn);
+            });
+        }
+        
+        // 네비게이션 시작
+        function navigateTo(dest) {
+            destination = dest;
+            
+            if (ROOMS[dest] !== undefined) {
+                destPosition = ROOMS[dest];
+            } else if (FACILITIES[dest] !== undefined) {
+                destPosition = FACILITIES[dest];
+            } else {
+                alert('알 수 없는 목적지');
+                return;
+            }
+            
+            startPosition = currentPosition;
+            isNavigating = true;
+            
+            document.getElementById('destSection').style.display = 'none';
+            document.getElementById('navPanel').classList.add('active');
+            
+            updateNavigation();
+        }
+        
+        // 네비게이션 취소
+        function cancelNavigation() {
+            isNavigating = false;
+            destination = null;
+            destPosition = null;
+            
+            document.getElementById('destSection').style.display = 'block';
+            document.getElementById('navPanel').classList.remove('active');
+        }
+        
+        // 네비게이션 업데이트
+        function updateNavigation() {
+            if (!isNavigating) return;
+            
+            const distance = destPosition - currentPosition;
+            const absDistance = Math.abs(distance);
+            
+            // 방향
+            const dirEl = document.getElementById('navDirection');
+            const instrEl = document.getElementById('navInstruction');
+            
+            if (absDistance < 2) {
+                // 도착!
+                dirEl.textContent = '🎉';
+                instrEl.textContent = `${destination} 도착!`;
+                document.getElementById('navStatus').className = 'nav-status arrived';
+                document.getElementById('navStatus').textContent = '✅ 도착했습니다!';
+                
+                // 진동 (모바일)
+                if (navigator.vibrate) {
+                    navigator.vibrate([200, 100, 200]);
+                }
+            } else if (distance > 0) {
+                // 앞으로 (7401 방향)
+                dirEl.textContent = '➡️';
+                instrEl.textContent = '직진하세요 →';
+                document.getElementById('navStatus').className = 'nav-status navigating';
+                document.getElementById('navStatus').textContent = '🚶 이동 중...';
+            } else {
+                // 뒤로 (7414 방향)
+                dirEl.textContent = '⬅️';
+                instrEl.textContent = '← 뒤로 가세요';
+                document.getElementById('navStatus').className = 'nav-status navigating';
+                document.getElementById('navStatus').textContent = '🚶 이동 중...';
+            }
+            
+            // 거리
+            document.getElementById('navDistance').textContent = absDistance.toFixed(1);
+            
+            // 진행률
+            const totalDistance = Math.abs(destPosition - startPosition);
+            const traveled = totalDistance - absDistance;
+            const progress = totalDistance > 0 ? (traveled / totalDistance) * 100 : 0;
+            document.getElementById('progressFill').style.width = Math.min(100, Math.max(0, progress)) + '%';
+            
+            // 미니맵 업데이트
+            updateMinimap();
+        }
+        
+        // 미니맵 업데이트
+        function updateMinimap() {
+            const minPos = -10;
+            const maxPos = 70;
+            const range = maxPos - minPos;
+            
+            const currentPct = ((currentPosition - minPos) / range) * 100;
+            document.getElementById('minimapCurrent').style.left = currentPct + '%';
+            
+            if (destPosition !== null) {
+                const destPct = ((destPosition - minPos) / range) * 100;
+                document.getElementById('minimapDest').style.left = destPct + '%';
+                document.getElementById('minimapDest').style.display = 'block';
+            } else {
+                document.getElementById('minimapDest').style.display = 'none';
+            }
+        }
+        
+        // 서버에서 위치 가져오기
+        async function fetchPosition() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                
+                currentPosition = data.position;
+                currentRoom = data.room;
+                
+                document.getElementById('currentRoom').textContent = currentRoom;
+                
+                // 버튼 업데이트
+                document.querySelectorAll('.room-btn').forEach(btn => {
+                    btn.classList.remove('current');
+                    if (btn.textContent === currentRoom) {
+                        btn.classList.add('current');
+                    }
+                });
+                
+                if (isNavigating) {
+                    updateNavigation();
+                }
+                
+                updateMinimap();
+                
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+        
+        // 초기화
+        createRoomButtons();
+        fetchPosition();
+        updateMinimap();
+        
+        // 주기적 업데이트
+        setInterval(fetchPosition, 500);
+    </script>
+</body>
+</html>

@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🗺️ Aruba AP 실내 위치 추적</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 20px 0;
+            margin-bottom: 20px;
+        }
+
+        header h1 {
+            font-size: 2rem;
+            color: #00d4ff;
+            text-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+        }
+
+        header p {
+            color: #8892b0;
+            margin-top: 10px;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 20px;
+        }
+
+        .map-container {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .map-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .map-title {
+            font-size: 1.2rem;
+            color: #00d4ff;
+        }
+
+        .map-canvas {
+            width: 100%;
+            height: 400px;
+            background: #0d1421;
+            border-radius: 12px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #mapCanvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .card-title {
+            font-size: 1rem;
+            color: #00d4ff;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .status-item {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .status-label {
+            font-size: 0.75rem;
+            color: #8892b0;
+            margin-bottom: 5px;
+        }
+
+        .status-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+
+        .control-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 212, 255, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ff4757 0%, #cc3344 100%);
+            color: #fff;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(255, 71, 87, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .position-display {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .position-coords {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #00ff88;
+            margin: 10px 0;
+        }
+
+        .ap-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .ap-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .ap-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ff4757;
+            margin-right: 10px;
+        }
+
+        .ap-indicator.active {
+            background: #00ff88;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .ap-name {
+            font-weight: 600;
+            flex: 1;
+        }
+
+        .ap-rssi {
+            font-size: 0.85rem;
+            color: #8892b0;
+        }
+
+        .simulation-controls {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .slider-container {
+            margin-bottom: 15px;
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 0.85rem;
+            color: #8892b0;
+        }
+
+        .slider {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.1);
+            appearance: none;
+            outline: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #00d4ff;
+            cursor: pointer;
+        }
+
+        .mode-toggle {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: transparent;
+            color: #8892b0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .mode-btn.active {
+            background: rgba(0, 212, 255, 0.2);
+            border-color: #00d4ff;
+            color: #00d4ff;
+        }
+
+        @media (max-width: 900px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📡 Aruba AP 실내 위치 추적 시스템</h1>
+            <p>6대의 AP를 활용한 실시간 위치 추정 및 궤적 시각화</p>
+        </header>
+
+        <div class="main-grid">
+            <!-- 맵 영역 -->
+            <div class="map-container">
+                <div class="map-header">
+                    <span class="map-title">🗺️ 실시간 위치 맵</span>
+                    <span id="lastUpdate" style="color: #8892b0; font-size: 0.85rem;">-</span>
+                </div>
+                <div class="map-canvas">
+                    <canvas id="mapCanvas"></canvas>
+                </div>
+            </div>
+
+            <!-- 사이드바 -->
+            <div class="sidebar">
+                <!-- 상태 카드 -->
+                <div class="card">
+                    <div class="card-title">📊 시스템 상태</div>
+                    <div class="status-grid">
+                        <div class="status-item">
+                            <div class="status-label">추적 상태</div>
+                            <div class="status-value" id="trackingStatus">대기</div>
+                        </div>
+                        <div class="status-item">
+                            <div class="status-label">AP 수</div>
+                            <div class="status-value" id="apCount">6</div>
+                        </div>
+                        <div class="status-item">
+                            <div class="status-label">궤적 포인트</div>
+                            <div class="status-value" id="trajectoryCount">0</div>
+                        </div>
+                        <div class="status-item">
+                            <div class="status-label">모드</div>
+                            <div class="status-value" id="currentMode">시뮬레이션</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 현재 위치 -->
+                <div class="card">
+                    <div class="card-title">📍 현재 위치</div>
+                    <div class="position-display">
+                        <div class="position-coords" id="positionCoords">- , -</div>
+                        <div style="font-size: 0.85rem; color: #8892b0;">미터 단위 좌표</div>
+                    </div>
+                </div>
+
+                <!-- 컨트롤 -->
+                <div class="card">
+                    <div class="card-title">🎮 컨트롤</div>
+                    <div class="control-buttons">
+                        <button class="btn btn-primary" id="btnStart" onclick="startTracking()">
+                            ▶️ 추적 시작
+                        </button>
+                        <button class="btn btn-danger" id="btnStop" onclick="stopTracking()" disabled>
+                            ⏹️ 추적 중지
+                        </button>
+                        <button class="btn btn-secondary" onclick="clearTrajectory()">
+                            🗑️ 궤적 초기화
+                        </button>
+                    </div>
+
+                    <!-- 시뮬레이션 컨트롤 -->
+                    <div class="simulation-controls">
+                        <div class="mode-toggle">
+                            <button class="mode-btn active" id="simMode" onclick="setMode(true)">시뮬레이션</button>
+                            <button class="mode-btn" id="realMode" onclick="setMode(false)">실제 BLE</button>
+                        </div>
+                        
+                        <div class="slider-container">
+                            <div class="slider-label">
+                                <span>X 좌표</span>
+                                <span id="xValue">35m</span>
+                            </div>
+                            <input type="range" class="slider" id="xSlider" min="5" max="75" value="35" oninput="updateSimPosition()">
+                        </div>
+                        
+                        <div class="slider-container">
+                            <div class="slider-label">
+                                <span>Y 좌표</span>
+                                <span id="yValue">5m</span>
+                            </div>
+                            <input type="range" class="slider" id="ySlider" min="2" max="10" value="5" oninput="updateSimPosition()">
+                        </div>
+                        
+                        <button class="btn btn-primary" onclick="simulateMove()">
+                            📍 위치 이동
+                        </button>
+                    </div>
+                </div>
+
+                <!-- AP 목록 -->
+                <div class="card">
+                    <div class="card-title">📡 AP 목록</div>
+                    <div class="ap-list" id="apList">
+                        <!-- AP 목록이 여기에 로드됨 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 캔버스 설정
+        const canvas = document.getElementById('mapCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // 맵 설정
+        const mapBounds = { min_x: 0, max_x: 80, min_y: 0, max_y: 15 };
+        let aps = [];
+        let trajectory = [];
+        let currentPosition = null;
+        let isTracking = false;
+
+        // 캔버스 크기 조정
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            drawMap();
+        }
+
+        // 좌표 변환 (실제 좌표 → 캔버스 좌표)
+        function toCanvasCoords(x, y) {
+            const padding = 40;
+            const scaleX = (canvas.width - padding * 2) / (mapBounds.max_x - mapBounds.min_x);
+            const scaleY = (canvas.height - padding * 2) / (mapBounds.max_y - mapBounds.min_y);
+            
+            return {
+                x: padding + (x - mapBounds.min_x) * scaleX,
+                y: canvas.height - padding - (y - mapBounds.min_y) * scaleY
+            };
+        }
+
+        // 맵 그리기
+        function drawMap() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 배경
+            ctx.fillStyle = '#0d1421';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 그리드
+            drawGrid();
+            
+            // 복도 영역
+            drawCorridor();
+            
+            // AP 표시
+            drawAPs();
+            
+            // 궤적 그리기
+            drawTrajectory();
+            
+            // 현재 위치
+            drawCurrentPosition();
+        }
+
+        // 그리드 그리기
+        function drawGrid() {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.lineWidth = 1;
+            
+            // 수직선 (10m 간격)
+            for (let x = 0; x <= mapBounds.max_x; x += 10) {
+                const p = toCanvasCoords(x, 0);
+                ctx.beginPath();
+                ctx.moveTo(p.x, 40);
+                ctx.lineTo(p.x, canvas.height - 40);
+                ctx.stroke();
+                
+                // 라벨
+                ctx.fillStyle = '#8892b0';
+                ctx.font = '10px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(`${x}m`, p.x, canvas.height - 25);
+            }
+            
+            // 수평선 (5m 간격)
+            for (let y = 0; y <= mapBounds.max_y; y += 5) {
+                const p = toCanvasCoords(0, y);
+                ctx.beginPath();
+                ctx.moveTo(40, p.y);
+                ctx.lineTo(canvas.width - 40, p.y);
+                ctx.stroke();
+                
+                // 라벨
+                ctx.fillStyle = '#8892b0';
+                ctx.font = '10px sans-serif';
+                ctx.textAlign = 'right';
+                ctx.fillText(`${y}m`, 35, p.y + 3);
+            }
+        }
+
+        // 복도 영역 그리기
+        function drawCorridor() {
+            const p1 = toCanvasCoords(5, 2);
+            const p2 = toCanvasCoords(75, 8);
+            
+            ctx.fillStyle = 'rgba(100, 100, 100, 0.2)';
+            ctx.strokeStyle = 'rgba(150, 150, 150, 0.5)';
+            ctx.lineWidth = 2;
+            
+            ctx.beginPath();
+            ctx.rect(p1.x, p2.y, p2.x - p1.x, p1.y - p2.y);
+            ctx.fill();
+            ctx.stroke();
+            
+            // 복도 라벨
+            const center = toCanvasCoords(40, 9);
+            ctx.fillStyle = '#8892b0';
+            ctx.font = '12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('복도', center.x, center.y);
+        }
+
+        // AP 그리기
+        function drawAPs() {
+            aps.forEach(ap => {
+                const pos = toCanvasCoords(ap.position.x, ap.position.y);
+                
+                // AP 범위 원
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, 50, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255, 71, 87, 0.1)';
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(255, 71, 87, 0.3)';
+                ctx.stroke();
+                
+                // AP 마커 (삼각형)
+                ctx.beginPath();
+                ctx.moveTo(pos.x, pos.y - 12);
+                ctx.lineTo(pos.x - 10, pos.y + 8);
+                ctx.lineTo(pos.x + 10, pos.y + 8);
+                ctx.closePath();
+                ctx.fillStyle = '#ff4757';
+                ctx.fill();
+                ctx.strokeStyle = '#cc3344';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // AP 이름
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 11px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(ap.name, pos.x, pos.y - 18);
+            });
+        }
+
+        // 궤적 그리기
+        function drawTrajectory() {
+            if (trajectory.length < 2) return;
+            
+            ctx.beginPath();
+            ctx.strokeStyle = '#00d4ff';
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            const first = toCanvasCoords(trajectory[0].x, trajectory[0].y);
+            ctx.moveTo(first.x, first.y);
+            
+            for (let i = 1; i < trajectory.length; i++) {
+                const p = toCanvasCoords(trajectory[i].x, trajectory[i].y);
+                ctx.lineTo(p.x, p.y);
+            }
+            
+            ctx.stroke();
+            
+            // 궤적 포인트
+            trajectory.forEach((point, i) => {
+                const p = toCanvasCoords(point.x, point.y);
+                
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+                ctx.fillStyle = i === 0 ? '#00ff88' : 'rgba(0, 212, 255, 0.5)';
+                ctx.fill();
+            });
+            
+            // 시작점 마커
+            if (trajectory.length > 0) {
+                const start = toCanvasCoords(trajectory[0].x, trajectory[0].y);
+                ctx.beginPath();
+                ctx.rect(start.x - 6, start.y - 6, 12, 12);
+                ctx.fillStyle = '#00ff88';
+                ctx.fill();
+                ctx.strokeStyle = '#00cc66';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+        }
+
+        // 현재 위치 그리기
+        function drawCurrentPosition() {
+            if (!currentPosition) return;
+            
+            const pos = toCanvasCoords(currentPosition.x, currentPosition.y);
+            
+            // 펄스 애니메이션 효과
+            const time = Date.now() / 1000;
+            const pulse = Math.sin(time * 3) * 5 + 20;
+            
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, pulse, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(0, 212, 255, 0.2)';
+            ctx.fill();
+            
+            // 메인 마커
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, 10, 0, Math.PI * 2);
+            ctx.fillStyle = '#00d4ff';
+            ctx.fill();
+            ctx.strokeStyle = '#0099cc';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            
+            // 중심점
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, 3, 0, Math.PI * 2);
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+        }
+
+        // AP 목록 로드
+        async function loadAPs() {
+            try {
+                const response = await fetch('/api/aps');
+                aps = await response.json();
+                
+                // AP 목록 UI 업데이트
+                const apList = document.getElementById('apList');
+                apList.innerHTML = aps.map(ap => `
+                    <div class="ap-item">
+                        <div class="ap-indicator"></div>
+                        <span class="ap-name">${ap.name}</span>
+                        <span class="ap-rssi">${ap.location}</span>
+                    </div>
+                `).join('');
+                
+                document.getElementById('apCount').textContent = aps.length;
+                drawMap();
+            } catch (error) {
+                console.error('AP 로드 오류:', error);
+            }
+        }
+
+        // 위치 및 궤적 업데이트
+        async function updatePosition() {
+            try {
+                // 위치 가져오기
+                const posResponse = await fetch('/api/position');
+                const posData = await posResponse.json();
+                
+                if (posData.success) {
+                    currentPosition = posData.position;
+                    document.getElementById('positionCoords').textContent = 
+                        `${currentPosition.x.toFixed(1)}m , ${currentPosition.y.toFixed(1)}m`;
+                }
+                
+                // 궤적 가져오기
+                const trajResponse = await fetch('/api/trajectory');
+                const trajData = await trajResponse.json();
+                trajectory = trajData.trajectory;
+                document.getElementById('trajectoryCount').textContent = trajData.count;
+                
+                // 마지막 업데이트 시간
+                if (currentPosition && currentPosition.datetime) {
+                    const time = new Date(currentPosition.datetime).toLocaleTimeString();
+                    document.getElementById('lastUpdate').textContent = `마지막 업데이트: ${time}`;
+                }
+                
+                drawMap();
+            } catch (error) {
+                console.error('위치 업데이트 오류:', error);
+            }
+        }
+
+        // 추적 시작
+        async function startTracking() {
+            try {
+                await fetch('/api/start', { method: 'POST' });
+                isTracking = true;
+                document.getElementById('trackingStatus').textContent = '추적 중';
+                document.getElementById('btnStart').disabled = true;
+                document.getElementById('btnStop').disabled = false;
+            } catch (error) {
+                console.error('추적 시작 오류:', error);
+            }
+        }
+
+        // 추적 중지
+        async function stopTracking() {
+            try {
+                await fetch('/api/stop', { method: 'POST' });
+                isTracking = false;
+                document.getElementById('trackingStatus').textContent = '중지됨';
+                document.getElementById('btnStart').disabled = false;
+                document.getElementById('btnStop').disabled = true;
+            } catch (error) {
+                console.error('추적 중지 오류:', error);
+            }
+        }
+
+        // 궤적 초기화
+        async function clearTrajectory() {
+            try {
+                await fetch('/api/clear', { method: 'POST' });
+                trajectory = [];
+                currentPosition = null;
+                document.getElementById('positionCoords').textContent = '- , -';
+                document.getElementById('trajectoryCount').textContent = '0';
+                drawMap();
+            } catch (error) {
+                console.error('초기화 오류:', error);
+            }
+        }
+
+        // 모드 변경
+        async function setMode(simulation) {
+            try {
+                await fetch('/api/mode', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ simulation })
+                });
+                
+                document.getElementById('simMode').classList.toggle('active', simulation);
+                document.getElementById('realMode').classList.toggle('active', !simulation);
+                document.getElementById('currentMode').textContent = simulation ? '시뮬레이션' : '실제 BLE';
+            } catch (error) {
+                console.error('모드 변경 오류:', error);
+            }
+        }
+
+        // 시뮬레이션 위치 업데이트
+        function updateSimPosition() {
+            const x = document.getElementById('xSlider').value;
+            const y = document.getElementById('ySlider').value;
+            document.getElementById('xValue').textContent = `${x}m`;
+            document.getElementById('yValue').textContent = `${y}m`;
+        }
+
+        // 시뮬레이션 이동
+        async function simulateMove() {
+            const x = parseFloat(document.getElementById('xSlider').value);
+            const y = parseFloat(document.getElementById('ySlider').value);
+            
+            try {
+                const response = await fetch('/api/simulate_move', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ x, y })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    await updatePosition();
+                }
+            } catch (error) {
+                console.error('시뮬레이션 이동 오류:', error);
+            }
+        }
+
+        // 애니메이션 루프
+        function animate() {
+            drawMap();
+            requestAnimationFrame(animate);
+        }
+
+        // 초기화
+        window.addEventListener('load', () => {
+            resizeCanvas();
+            loadAPs();
+            animate();
+            
+            // 주기적 업데이트
+            setInterval(updatePosition, 1000);
+        });
+
+        window.addEventListener('resize', resizeCanvas);
+    </script>
+</body>
+</html>

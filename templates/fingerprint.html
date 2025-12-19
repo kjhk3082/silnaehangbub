@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📍 WiFi Fingerprinting 수집</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', monospace;
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+        
+        .container { max-width: 900px; margin: 0 auto; }
+        
+        h1 { text-align: center; margin-bottom: 10px; }
+        .subtitle { text-align: center; color: #888; margin-bottom: 20px; }
+        
+        /* 현재 RSSI */
+        .rssi-box {
+            background: linear-gradient(135deg, #00d4ff22, #00d4ff11);
+            border: 2px solid #00d4ff;
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .rssi-value {
+            font-size: 4rem;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+        
+        /* 지도 */
+        .map-section {
+            background: #0a0a15;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .floor-map {
+            display: grid;
+            grid-template-columns: repeat(14, 1fr);
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+        
+        .room-cell {
+            aspect-ratio: 1;
+            border: 2px solid #333;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+        
+        .room-cell:hover {
+            border-color: #00d4ff;
+            transform: scale(1.1);
+            z-index: 10;
+        }
+        
+        .room-cell.selected {
+            border-color: #2ecc71;
+            background: rgba(46, 204, 113, 0.3);
+        }
+        
+        .room-cell.has-data {
+            background: rgba(243, 156, 18, 0.3);
+            border-color: #f39c12;
+        }
+        
+        .room-cell.has-data.selected {
+            background: rgba(46, 204, 113, 0.5);
+        }
+        
+        .room-cell .count {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            background: #f39c12;
+            color: #000;
+            font-size: 0.6rem;
+            padding: 1px 4px;
+            border-radius: 3px;
+        }
+        
+        .corridor { background: #1a1a3e; }
+        .facility { background: #2c3e50; color: #95a5a6; }
+        
+        /* 복도 라벨 */
+        .corridor-label {
+            text-align: center;
+            color: #666;
+            font-size: 0.8rem;
+            margin: 5px 0;
+        }
+        
+        /* 수집 컨트롤 */
+        .collect-section {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .selected-info {
+            font-size: 1.5rem;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        
+        .selected-info span {
+            color: #2ecc71;
+            font-weight: bold;
+        }
+        
+        .collect-btn {
+            width: 100%;
+            padding: 20px;
+            font-size: 1.3rem;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .collect-btn:hover:not(:disabled) {
+            transform: scale(1.02);
+        }
+        
+        .collect-btn:disabled {
+            background: #444;
+            cursor: not-allowed;
+        }
+        
+        .collect-btn.collecting {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        /* 샘플 개수 설정 */
+        .sample-setting {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .sample-setting input {
+            width: 80px;
+            padding: 10px;
+            font-size: 1.2rem;
+            text-align: center;
+            border: 2px solid #333;
+            border-radius: 8px;
+            background: #1a1a2e;
+            color: #fff;
+        }
+        
+        /* 통계 */
+        .stats-section {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+        
+        .stat-item {
+            text-align: center;
+            padding: 15px;
+            background: #1a1a3e;
+            border-radius: 10px;
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+        
+        .stat-label {
+            color: #888;
+            font-size: 0.8rem;
+        }
+        
+        /* 데이터 테이블 */
+        .data-section {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 10px;
+            text-align: center;
+            border-bottom: 1px solid #333;
+        }
+        
+        th { background: #1a1a3e; color: #00d4ff; }
+        
+        /* 버튼들 */
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .action-btn {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        
+        .action-btn.save { background: #3498db; color: #fff; }
+        .action-btn.clear { background: #e74c3c; color: #fff; }
+        .action-btn.test { background: #9b59b6; color: #fff; }
+        .action-btn.back { background: #666; color: #fff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📍 WiFi Fingerprinting</h1>
+        <p class="subtitle">각 위치에서 RSSI 패턴을 수집하세요</p>
+        
+        <!-- 현재 RSSI -->
+        <div class="rssi-box">
+            <div class="rssi-value" id="currentRssi">--</div>
+            <div style="color:#888;">현재 RSSI (dBm) - 실시간</div>
+        </div>
+        
+        <!-- 지도 -->
+        <div class="map-section">
+            <div class="corridor-label">↑ 위쪽 복도</div>
+            <div class="floor-map" id="upperCorridor"></div>
+            <div class="corridor-label" style="margin: 15px 0;">── 복도 ──</div>
+            <div class="floor-map" id="lowerCorridor"></div>
+            <div class="corridor-label">↓ 아래쪽 복도</div>
+        </div>
+        
+        <!-- 수집 컨트롤 -->
+        <div class="collect-section">
+            <div class="selected-info">
+                선택된 위치: <span id="selectedLocation">없음</span>
+            </div>
+            <div class="sample-setting">
+                <label>샘플 개수:</label>
+                <input type="number" id="sampleCount" value="10" min="1" max="50">
+                <span style="color:#888;">(여러 번 측정해서 평균)</span>
+            </div>
+            <button class="collect-btn" id="collectBtn" onclick="startCollect()" disabled>
+                📍 이 위치에서 수집 시작
+            </button>
+        </div>
+        
+        <!-- 통계 -->
+        <div class="stats-section">
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value" id="totalLocations">0</div>
+                    <div class="stat-label">수집된 위치</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="totalSamples">0</div>
+                    <div class="stat-label">총 샘플 수</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="coverage">0%</div>
+                    <div class="stat-label">커버리지</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 데이터 테이블 -->
+        <div class="data-section">
+            <h3 style="color:#00d4ff; margin-bottom:10px;">📊 수집된 Fingerprint 데이터</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>위치</th>
+                        <th>평균 RSSI</th>
+                        <th>최소</th>
+                        <th>최대</th>
+                        <th>샘플수</th>
+                    </tr>
+                </thead>
+                <tbody id="dataTable"></tbody>
+            </table>
+        </div>
+        
+        <!-- 버튼들 -->
+        <div class="action-buttons">
+            <button class="action-btn save" onclick="saveFingerprint()">💾 저장</button>
+            <button class="action-btn test" onclick="location.href='/fingerprint/test'">🧪 테스트</button>
+            <button class="action-btn clear" onclick="clearData()">🗑️ 초기화</button>
+            <button class="action-btn back" onclick="location.href='/'">← 메인</button>
+        </div>
+    </div>
+    
+    <script>
+        // 호실 정의
+        const UPPER_CORRIDOR = ['7416', '', '7420', '', '7422', '', '7423', '', '7424', '', '7425', '', '7429', '7430'];
+        const LOWER_CORRIDOR = ['7414', '7413', 'WC', 'STAIR', 'EV', '7412', '7411', '7410', '7409', '7408', '7407', '7406', '7405', '7404', '7403', '7401', 'WC2', 'STAIR2'];
+        
+        let selectedLocation = null;
+        let fingerprintData = {};
+        let currentRssi = -50;
+        let isCollecting = false;
+        
+        // 지도 생성
+        function createMap() {
+            const upper = document.getElementById('upperCorridor');
+            const lower = document.getElementById('lowerCorridor');
+            
+            upper.innerHTML = UPPER_CORRIDOR.map(room => {
+                if (!room) return '<div class="room-cell corridor"></div>';
+                const isRoom = room.startsWith('74');
+                return `<div class="room-cell ${isRoom ? '' : 'facility'}" data-room="${room}" onclick="selectLocation('${room}')">${room}</div>`;
+            }).join('');
+            
+            lower.innerHTML = LOWER_CORRIDOR.map(room => {
+                const isRoom = room.startsWith('74');
+                const isFacility = ['WC', 'WC2', 'STAIR', 'STAIR2', 'EV'].includes(room);
+                return `<div class="room-cell ${isFacility ? 'facility' : ''}" data-room="${room}" onclick="selectLocation('${room}')">${room}</div>`;
+            }).join('');
+        }
+        
+        // 위치 선택
+        function selectLocation(room) {
+            selectedLocation = room;
+            
+            document.querySelectorAll('.room-cell').forEach(cell => {
+                cell.classList.remove('selected');
+            });
+            document.querySelector(`[data-room="${room}"]`)?.classList.add('selected');
+            
+            document.getElementById('selectedLocation').textContent = room;
+            document.getElementById('collectBtn').disabled = false;
+        }
+        
+        // 수집 시작
+        async function startCollect() {
+            if (!selectedLocation || isCollecting) return;
+            
+            isCollecting = true;
+            const btn = document.getElementById('collectBtn');
+            btn.classList.add('collecting');
+            
+            const sampleCount = parseInt(document.getElementById('sampleCount').value) || 10;
+            const samples = [];
+            
+            for (let i = 0; i < sampleCount; i++) {
+                btn.textContent = `📡 수집 중... (${i + 1}/${sampleCount})`;
+                
+                try {
+                    const response = await fetch('/api/status');
+                    const data = await response.json();
+                    samples.push(data.raw_rssi);
+                } catch (e) {
+                    samples.push(currentRssi);
+                }
+                
+                await new Promise(r => setTimeout(r, 200));
+            }
+            
+            // 통계 계산
+            const avg = Math.round(samples.reduce((a, b) => a + b, 0) / samples.length);
+            const min = Math.min(...samples);
+            const max = Math.max(...samples);
+            
+            // 저장
+            if (!fingerprintData[selectedLocation]) {
+                fingerprintData[selectedLocation] = { samples: [], avg: 0, min: 0, max: 0 };
+            }
+            
+            fingerprintData[selectedLocation].samples.push(...samples);
+            fingerprintData[selectedLocation].avg = avg;
+            fingerprintData[selectedLocation].min = min;
+            fingerprintData[selectedLocation].max = max;
+            
+            // UI 업데이트
+            updateUI();
+            
+            btn.classList.remove('collecting');
+            btn.textContent = `✅ ${selectedLocation} 저장 완료! (평균: ${avg} dBm)`;
+            
+            setTimeout(() => {
+                btn.textContent = '📍 이 위치에서 수집 시작';
+            }, 2000);
+            
+            isCollecting = false;
+        }
+        
+        // UI 업데이트
+        function updateUI() {
+            // 지도에 수집된 위치 표시
+            document.querySelectorAll('.room-cell').forEach(cell => {
+                const room = cell.dataset.room;
+                if (fingerprintData[room]) {
+                    cell.classList.add('has-data');
+                    const count = fingerprintData[room].samples.length;
+                    let countEl = cell.querySelector('.count');
+                    if (!countEl) {
+                        countEl = document.createElement('span');
+                        countEl.className = 'count';
+                        cell.appendChild(countEl);
+                    }
+                    countEl.textContent = count;
+                }
+            });
+            
+            // 통계
+            const locations = Object.keys(fingerprintData).length;
+            const totalSamples = Object.values(fingerprintData).reduce((sum, d) => sum + d.samples.length, 0);
+            const totalRooms = UPPER_CORRIDOR.filter(r => r.startsWith('74')).length + 
+                              LOWER_CORRIDOR.filter(r => r.startsWith('74')).length;
+            const coverage = Math.round((locations / totalRooms) * 100);
+            
+            document.getElementById('totalLocations').textContent = locations;
+            document.getElementById('totalSamples').textContent = totalSamples;
+            document.getElementById('coverage').textContent = coverage + '%';
+            
+            // 테이블
+            const tbody = document.getElementById('dataTable');
+            tbody.innerHTML = Object.entries(fingerprintData)
+                .sort((a, b) => b[1].avg - a[1].avg)
+                .map(([room, data]) => `
+                    <tr>
+                        <td><strong>${room}</strong></td>
+                        <td style="color:#00d4ff;">${data.avg} dBm</td>
+                        <td>${data.min}</td>
+                        <td>${data.max}</td>
+                        <td>${data.samples.length}</td>
+                    </tr>
+                `).join('');
+        }
+        
+        // 저장
+        async function saveFingerprint() {
+            if (Object.keys(fingerprintData).length === 0) {
+                alert('수집된 데이터가 없습니다!');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/fingerprint/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(fingerprintData)
+                });
+                const result = await response.json();
+                alert(`✅ 저장 완료!\n${result.filename}\n${result.count}개 위치`);
+            } catch (e) {
+                // 로컬 다운로드
+                const blob = new Blob([JSON.stringify(fingerprintData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `fingerprint_${Date.now()}.json`;
+                a.click();
+            }
+        }
+        
+        // 초기화
+        function clearData() {
+            if (!confirm('모든 데이터를 삭제하시겠습니까?')) return;
+            fingerprintData = {};
+            document.querySelectorAll('.room-cell').forEach(cell => {
+                cell.classList.remove('has-data');
+                const count = cell.querySelector('.count');
+                if (count) count.remove();
+            });
+            updateUI();
+        }
+        
+        // RSSI 패턴 업데이트
+        async function updateRssi() {
+            try {
+                // 단일 RSSI
+                const statusRes = await fetch('/api/status');
+                const statusData = await statusRes.json();
+                currentRssi = statusData.raw_rssi;
+                
+                // RSSI 패턴 스캔
+                const patternRes = await fetch('/api/fingerprint/scan');
+                const patternData = await patternRes.json();
+                
+                if (patternData.pattern) {
+                    document.getElementById('currentRssi').innerHTML = 
+                        `${statusData.rssi} <small style="font-size:0.4em; color:#888;">(패턴: ${patternData.count}개 AP)</small>`;
+                } else {
+                    document.getElementById('currentRssi').textContent = statusData.rssi;
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+        
+        // 수집 (패턴 기반)
+        async function startCollect() {
+            if (!selectedLocation || isCollecting) return;
+            
+            isCollecting = true;
+            const btn = document.getElementById('collectBtn');
+            btn.classList.add('collecting');
+            btn.textContent = '📡 RSSI 패턴 수집 중...';
+            
+            try {
+                const sampleCount = parseInt(document.getElementById('sampleCount').value) || 10;
+                
+                const response = await fetch('/api/fingerprint/collect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        location: selectedLocation,
+                        samples: sampleCount
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'collected') {
+                    // 로컬 데이터 업데이트
+                    fingerprintData[selectedLocation] = {
+                        samples: result.pattern,
+                        avg: result.pattern[0] || 0,
+                        min: Math.min(...result.pattern),
+                        max: Math.max(...result.pattern),
+                        pattern: result.pattern
+                    };
+                    
+                    updateUI();
+                    btn.textContent = `✅ ${selectedLocation} 저장! (${result.pattern.length}개 AP 패턴)`;
+                } else {
+                    btn.textContent = '❌ 수집 실패';
+                }
+            } catch (e) {
+                console.error(e);
+                btn.textContent = '❌ 에러 발생';
+            }
+            
+            setTimeout(() => {
+                btn.classList.remove('collecting');
+                btn.textContent = '📍 이 위치에서 수집 시작';
+                isCollecting = false;
+            }, 2000);
+        }
+        
+        // 초기화
+        createMap();
+        updateUI();
+        updateRssi();
+        setInterval(updateRssi, 1000);
+    </script>
+</body>
+</html>

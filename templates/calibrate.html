@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📐 캘리브레이션</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', monospace;
+            background: #1a1a2e;
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        /* 실시간 RSSI */
+        .rssi-display {
+            background: #0a0a15;
+            border: 2px solid #00d4ff;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .rssi-value {
+            font-size: 5rem;
+            font-weight: bold;
+            color: #00d4ff;
+            font-family: monospace;
+        }
+        
+        .rssi-label {
+            color: #888;
+            margin-top: 5px;
+        }
+        
+        .rssi-update {
+            color: #2ecc71;
+            font-size: 0.8rem;
+            margin-top: 10px;
+        }
+        
+        /* 입력 영역 */
+        .input-section {
+            background: #0a0a15;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .input-row {
+            display: flex;
+            gap: 10px;
+        }
+        
+        #locationInput {
+            flex: 1;
+            padding: 15px 20px;
+            font-size: 1.5rem;
+            border: 2px solid #333;
+            border-radius: 10px;
+            background: #1a1a2e;
+            color: #fff;
+            font-family: monospace;
+        }
+        
+        #locationInput:focus {
+            outline: none;
+            border-color: #00d4ff;
+        }
+        
+        #saveBtn {
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            border: none;
+            border-radius: 10px;
+            background: #2ecc71;
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        #saveBtn:hover {
+            background: #27ae60;
+        }
+        
+        .hint {
+            color: #666;
+            font-size: 0.9rem;
+            margin-top: 10px;
+        }
+        
+        /* 저장 로그 */
+        .log-section {
+            background: #0a0a15;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .log-section h3 {
+            color: #00d4ff;
+            margin-bottom: 10px;
+        }
+        
+        .log-entry {
+            padding: 10px;
+            border-bottom: 1px solid #333;
+            font-family: monospace;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+        
+        .log-entry.new {
+            background: rgba(46, 204, 113, 0.2);
+            animation: flash 0.5s;
+        }
+        
+        @keyframes flash {
+            0% { background: rgba(46, 204, 113, 0.5); }
+            100% { background: rgba(46, 204, 113, 0.2); }
+        }
+        
+        .log-location {
+            color: #fff;
+            font-weight: bold;
+        }
+        
+        .log-rssi {
+            color: #00d4ff;
+        }
+        
+        .log-time {
+            color: #666;
+            font-size: 0.8rem;
+        }
+        
+        /* 버튼들 */
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .action-btn {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        
+        .action-btn.save { background: #3498db; color: #fff; }
+        .action-btn.clear { background: #e74c3c; color: #fff; }
+        .action-btn.back { background: #666; color: #fff; }
+        
+        /* 카운터 */
+        .counter {
+            text-align: center;
+            font-size: 1.2rem;
+            color: #888;
+            margin-bottom: 20px;
+        }
+        
+        .counter span {
+            color: #00d4ff;
+            font-weight: bold;
+            font-size: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📐 캘리브레이션</h1>
+        
+        <!-- 실시간 RSSI -->
+        <div class="rssi-display">
+            <div class="rssi-value" id="rssiValue">--</div>
+            <div class="rssi-label">현재 RSSI (dBm)</div>
+            <div class="rssi-update">🔄 실시간 업데이트 중</div>
+        </div>
+        
+        <!-- 입력 -->
+        <div class="input-section">
+            <div class="input-row">
+                <input type="text" id="locationInput" placeholder="위치 입력 (예: 7413, 엘베)" autofocus>
+                <button id="saveBtn" onclick="saveCalibration()">저장</button>
+            </div>
+            <div class="hint">💡 위치 입력 후 엔터 또는 저장 버튼</div>
+        </div>
+        
+        <!-- 카운터 -->
+        <div class="counter">
+            저장된 포인트: <span id="counter">0</span>개
+        </div>
+        
+        <!-- 로그 -->
+        <div class="log-section">
+            <h3>📋 저장 기록</h3>
+            <div id="logList">
+                <div style="color:#666; text-align:center; padding:20px;">아직 저장된 데이터 없음</div>
+            </div>
+        </div>
+        
+        <!-- 버튼들 -->
+        <div class="action-buttons">
+            <button class="action-btn save" onclick="exportData()">💾 JSON 저장</button>
+            <button class="action-btn clear" onclick="clearData()">🗑️ 전체 삭제</button>
+            <button class="action-btn back" onclick="location.href='/'">← 메인</button>
+        </div>
+    </div>
+    
+    <script>
+        let currentRssi = -50;
+        let calibrationData = [];
+        
+        // 엔터키로 저장
+        document.getElementById('locationInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                saveCalibration();
+            }
+        });
+        
+        // RSSI 실시간 업데이트
+        async function updateRssi() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                currentRssi = data.rssi;
+                document.getElementById('rssiValue').textContent = currentRssi;
+            } catch (error) {
+                document.getElementById('rssiValue').textContent = '--';
+            }
+        }
+        
+        // 저장
+        function saveCalibration() {
+            const input = document.getElementById('locationInput');
+            const location = input.value.trim();
+            
+            if (!location) {
+                input.focus();
+                return;
+            }
+            
+            const entry = {
+                location: location,
+                rssi: currentRssi,
+                time: new Date().toLocaleTimeString()
+            };
+            
+            calibrationData.push(entry);
+            
+            // 로그 업데이트
+            updateLog();
+            
+            // 카운터 업데이트
+            document.getElementById('counter').textContent = calibrationData.length;
+            
+            // 입력 초기화
+            input.value = '';
+            input.focus();
+        }
+        
+        // 로그 업데이트
+        function updateLog() {
+            const logList = document.getElementById('logList');
+            
+            if (calibrationData.length === 0) {
+                logList.innerHTML = '<div style="color:#666; text-align:center; padding:20px;">아직 저장된 데이터 없음</div>';
+                return;
+            }
+            
+            logList.innerHTML = calibrationData.map((item, i) => `
+                <div class="log-entry ${i === calibrationData.length - 1 ? 'new' : ''}">
+                    <span class="log-location">${item.location}</span>
+                    <span class="log-rssi">${item.rssi} dBm</span>
+                    <span class="log-time">${item.time}</span>
+                </div>
+            `).reverse().join('');
+        }
+        
+        // JSON 저장
+        async function exportData() {
+            if (calibrationData.length === 0) {
+                alert('저장할 데이터가 없습니다!');
+                return;
+            }
+            
+            // 서버에 저장
+            try {
+                const response = await fetch('/api/calibration/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ data: calibrationData })
+                });
+                const result = await response.json();
+                alert(`✅ 저장 완료!\n${result.filename}`);
+            } catch (error) {
+                // 서버 저장 실패시 로컬 다운로드
+                const data = JSON.stringify({
+                    created_at: new Date().toISOString(),
+                    count: calibrationData.length,
+                    data: calibrationData
+                }, null, 2);
+                
+                const blob = new Blob([data], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `calibration_${Date.now()}.json`;
+                a.click();
+            }
+        }
+        
+        // 전체 삭제
+        function clearData() {
+            if (!confirm('모든 데이터를 삭제하시겠습니까?')) return;
+            calibrationData = [];
+            updateLog();
+            document.getElementById('counter').textContent = '0';
+        }
+        
+        // 초기화
+        updateRssi();
+        setInterval(updateRssi, 300);
+    </script>
+</body>
+</html>

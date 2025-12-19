@@ -1,0 +1,18 @@
+# Aruba AP 실내 위치 추적 시스템 의존성
+
+# BLE 스캐닝
+bleak>=0.22.0
+
+# 웹 프레임워크
+Flask>=3.0.0
+Flask-CORS>=4.0.0
+
+# 위치 추정 계산
+numpy>=1.26.0
+scipy>=1.11.0
+
+# 시각화
+matplotlib>=3.8.0
+
+# 유틸리티
+python-dateutil>=2.8.0

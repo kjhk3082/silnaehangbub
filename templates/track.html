@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚶 실내 위치 추적 시스템</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 15px;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+        }
+        
+        /* 상태 바 */
+        .status-bar {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .status-item {
+            text-align: center;
+        }
+        
+        .status-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+        
+        .status-label {
+            font-size: 0.75rem;
+            color: #888;
+        }
+        
+        /* 추적 상태 표시 */
+        .tracking-status {
+            text-align: center;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+        
+        .tracking-status.idle {
+            background: rgba(255,255,255,0.1);
+            color: #888;
+        }
+        
+        .tracking-status.recording {
+            background: rgba(231, 76, 60, 0.3);
+            color: #e74c3c;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        
+        /* 맵 */
+        .map-container {
+            background: rgba(255,255,255,0.03);
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
+        #corridor-map {
+            width: 100%;
+            height: 150px;
+            background: #0a0a15;
+            border-radius: 10px;
+        }
+        
+        /* 컨트롤 버튼 */
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+        
+        button {
+            padding: 12px 25px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+        
+        button:hover:not(:disabled) {
+            transform: scale(1.05);
+        }
+        
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        
+        .btn-start { background: linear-gradient(135deg, #2ecc71, #27ae60); color: #fff; }
+        .btn-stop { background: linear-gradient(135deg, #e74c3c, #c0392b); color: #fff; }
+        .btn-save { background: linear-gradient(135deg, #3498db, #2980b9); color: #fff; }
+        .btn-view { background: linear-gradient(135deg, #9b59b6, #8e44ad); color: #fff; }
+        .btn-clear { background: #444; color: #fff; }
+        
+        /* 네비게이션 토글 */
+        .navi-section {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .navi-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .navi-header h3 {
+            color: #00d4ff;
+        }
+        
+        /* 토글 스위치 */
+        .toggle-switch {
+            position: relative;
+            width: 60px;
+            height: 30px;
+        }
+        
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #333;
+            border-radius: 30px;
+            transition: 0.3s;
+        }
+        
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 4px;
+            bottom: 4px;
+            background: #fff;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+        
+        input:checked + .toggle-slider {
+            background: #00d4ff;
+        }
+        
+        input:checked + .toggle-slider:before {
+            transform: translateX(30px);
+        }
+        
+        /* 네비 패널 */
+        .navi-panel {
+            display: none;
+        }
+        
+        .navi-panel.active {
+            display: block;
+        }
+        
+        .room-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .room-btn {
+            padding: 10px 5px;
+            border: 2px solid #333;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.05);
+            color: #fff;
+            font-size: 0.85rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .room-btn:hover {
+            border-color: #00d4ff;
+        }
+        
+        .room-btn.current {
+            border-color: #2ecc71;
+            background: rgba(46, 204, 113, 0.2);
+        }
+        
+        .room-btn.destination {
+            border-color: #e74c3c;
+            background: rgba(231, 76, 60, 0.3);
+        }
+        
+        /* 네비 안내 */
+        .navi-guidance {
+            background: linear-gradient(135deg, #1a1a3e, #2a2a5e);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            display: none;
+        }
+        
+        .navi-guidance.active {
+            display: block;
+        }
+        
+        .navi-arrow {
+            font-size: 4rem;
+            margin-bottom: 10px;
+        }
+        
+        .navi-text {
+            font-size: 1.3rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .navi-distance {
+            font-size: 2.5rem;
+            color: #00d4ff;
+            font-weight: bold;
+        }
+        
+        .navi-distance-label {
+            color: #888;
+            font-size: 0.9rem;
+        }
+        
+        .progress-bar {
+            background: #333;
+            border-radius: 8px;
+            height: 12px;
+            margin: 15px 0;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            background: linear-gradient(90deg, #00d4ff, #00ff88);
+            height: 100%;
+            transition: width 0.5s;
+        }
+        
+        /* 기록 정보 */
+        .record-info {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .record-info h3 {
+            color: #00d4ff;
+            margin-bottom: 10px;
+        }
+        
+        .record-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        
+        .record-stat {
+            text-align: center;
+            padding: 10px;
+            background: #1a1a3e;
+            border-radius: 8px;
+        }
+        
+        .record-stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #fff;
+        }
+        
+        .record-stat-label {
+            font-size: 0.75rem;
+            color: #888;
+        }
+        
+        /* 저장 완료 모달 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: linear-gradient(135deg, #1a1a3e, #2a2a5e);
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+        
+        .modal-icon {
+            font-size: 4rem;
+            margin-bottom: 15px;
+        }
+        
+        .modal-title {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+        }
+        
+        .modal-info {
+            color: #888;
+            margin-bottom: 20px;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        
+        /* 그래프 */
+        .graph-container {
+            background: rgba(255,255,255,0.03);
+            border-radius: 15px;
+            padding: 15px;
+        }
+        
+        #graph-canvas {
+            width: 100%;
+            height: 200px;
+            background: #0a0a15;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚶 실내 위치 추적 시스템</h1>
+        
+        <!-- 추적 상태 -->
+        <div class="tracking-status idle" id="trackingStatus">
+            ⏸️ 대기 중 - 추적 시작을 눌러주세요
+        </div>
+        
+        <!-- 상태 바 -->
+        <div class="status-bar">
+            <div class="status-item">
+                <div class="status-value" id="rssiValue">--</div>
+                <div class="status-label">RSSI (dBm)</div>
+            </div>
+            <div class="status-item">
+                <div class="status-value" id="roomValue">7413</div>
+                <div class="status-label">현재 호실</div>
+            </div>
+            <div class="status-item">
+                <div class="status-value" id="confidenceValue">-</div>
+                <div class="status-label">신뢰도</div>
+            </div>
+            <div class="status-item">
+                <div class="status-value" id="methodValue">-</div>
+                <div class="status-label">측위 방식</div>
+            </div>
+        </div>
+        
+        <!-- 맵 -->
+        <div class="map-container">
+            <canvas id="corridor-map"></canvas>
+        </div>
+        
+        <!-- 컨트롤 -->
+        <div class="controls">
+            <button class="btn-start" id="startBtn" onclick="startTracking()">▶️ 추적 시작</button>
+            <button class="btn-stop" id="stopBtn" onclick="stopTracking()" disabled>⏹️ 정지 & 저장</button>
+            <button class="btn-clear" id="clearBtn" onclick="clearData()">🗑️ 초기화</button>
+        </div>
+        
+        <!-- 기록 정보 -->
+        <div class="record-info" id="recordInfo" style="display:none;">
+            <h3>📊 기록 중...</h3>
+            <div class="record-stats">
+                <div class="record-stat">
+                    <div class="record-stat-value" id="recordTime">0.0</div>
+                    <div class="record-stat-label">시간 (초)</div>
+                </div>
+                <div class="record-stat">
+                    <div class="record-stat-value" id="recordPoints">0</div>
+                    <div class="record-stat-label">포인트</div>
+                </div>
+                <div class="record-stat">
+                    <div class="record-stat-value" id="recordRooms">0</div>
+                    <div class="record-stat-label">방문 호실</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 네비게이션 섹션 -->
+        <div class="navi-section">
+            <div class="navi-header">
+                <h3>🧭 강의실 찾기 네비게이션</h3>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="naviToggle" onchange="toggleNavi()">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            
+            <!-- 네비 패널 -->
+            <div class="navi-panel" id="naviPanel">
+                <p style="color:#888; margin-bottom:10px; font-size:0.9rem;">목적지를 선택하세요:</p>
+                <div class="room-grid" id="roomGrid"></div>
+                
+                <!-- 네비 안내 -->
+                <div class="navi-guidance" id="naviGuidance">
+                    <div class="navi-arrow" id="naviArrow">➡️</div>
+                    <div class="navi-text" id="naviText">직진하세요</div>
+                    <div class="navi-distance" id="naviDistance">0.0</div>
+                    <div class="navi-distance-label">미터 남음</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="naviProgress" style="width:0%"></div>
+                    </div>
+                    <button class="btn-clear" onclick="cancelNavi()" style="margin-top:10px;">❌ 안내 종료</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 그래프 -->
+        <div class="graph-container">
+            <h3 style="color:#00d4ff; margin-bottom:10px;">📈 실시간 위치 그래프</h3>
+            <canvas id="graph-canvas"></canvas>
+        </div>
+    </div>
+    
+    <!-- 저장 완료 모달 -->
+    <div class="modal" id="saveModal">
+        <div class="modal-content">
+            <div class="modal-icon">✅</div>
+            <div class="modal-title">저장 완료!</div>
+            <div class="modal-info" id="saveInfo">
+                파일명: track_xxx.json<br>
+                기록: 100개 포인트 / 50.0초
+            </div>
+            <div class="modal-buttons">
+                <button class="btn-view" onclick="goToAnalysis()">📊 결과 분석 보기</button>
+                <button class="btn-clear" onclick="closeModal()">닫기</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 호실 위치
+        // Fingerprint 수집 순서 기반 (7413 = 0m, EV쪽 벽 기준)
+        // 7413 → STAIR → EV → 7412 → 7411 → ... → 7404
+        const ROOMS = {
+            "7414": -5.0,
+            "7413": 0.0,      // 원점
+            "STAIR": 5.0,     // 계단
+            "EV": 10.0,       // 엘리베이터
+            "7412": 15.0,
+            "7411": 20.0,
+            "7410": 25.0,
+            "7409": 30.0,
+            "7408": 35.0,
+            "7407": 40.0,
+            "7406": 45.0,
+            "7405": 50.0,
+            "7404": 55.0,
+            "7403": 60.0,
+            "7401": 65.0,
+        };
+        
+        // 상태 변수
+        let isTracking = false;
+        let trajectory = [];
+        let startTime = null;
+        let currentPosition = 0;
+        let currentRoom = "7413";
+        let lastFilename = null;
+        
+        // 네비게이션
+        let naviEnabled = false;
+        let destination = null;
+        let destPosition = null;
+        let naviStartPosition = null;
+        
+        // 캔버스
+        const mapCanvas = document.getElementById('corridor-map');
+        const mapCtx = mapCanvas.getContext('2d');
+        const graphCanvas = document.getElementById('graph-canvas');
+        const graphCtx = graphCanvas.getContext('2d');
+        
+        // 캔버스 크기 조정
+        function resizeCanvases() {
+            const dpr = window.devicePixelRatio || 1;
+            
+            mapCanvas.width = mapCanvas.offsetWidth * dpr;
+            mapCanvas.height = mapCanvas.offsetHeight * dpr;
+            mapCtx.scale(dpr, dpr);
+            
+            graphCanvas.width = graphCanvas.offsetWidth * dpr;
+            graphCanvas.height = graphCanvas.offsetHeight * dpr;
+            graphCtx.scale(dpr, dpr);
+        }
+        
+        window.addEventListener('resize', resizeCanvases);
+        resizeCanvases();
+        
+        // 호실 버튼 생성
+        function createRoomButtons() {
+            const grid = document.getElementById('roomGrid');
+            grid.innerHTML = '';
+            
+            Object.keys(ROOMS).forEach(room => {
+                const btn = document.createElement('button');
+                btn.className = 'room-btn';
+                btn.textContent = room;
+                btn.onclick = () => setDestination(room);
+                btn.id = `room-btn-${room}`;
+                grid.appendChild(btn);
+            });
+        }
+        
+        // 추적 시작
+        async function startTracking() {
+            isTracking = true;
+            startTime = Date.now();
+            trajectory = [];
+            
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            document.getElementById('trackingStatus').className = 'tracking-status recording';
+            document.getElementById('trackingStatus').innerHTML = '🔴 REC 기록 중...';
+            document.getElementById('recordInfo').style.display = 'block';
+            
+            await fetch('/api/start');
+        }
+        
+        // 추적 정지 & 저장
+        async function stopTracking() {
+            isTracking = false;
+            
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('trackingStatus').className = 'tracking-status idle';
+            document.getElementById('trackingStatus').innerHTML = '⏸️ 정지됨 - 저장 중...';
+            
+            // 서버에 정지 및 저장 요청
+            await fetch('/api/stop');
+            const saveResponse = await fetch('/api/save', { method: 'POST' });
+            const saveData = await saveResponse.json();
+            
+            lastFilename = saveData.filename;
+            
+            // 모달 표시
+            document.getElementById('saveInfo').innerHTML = `
+                📁 파일: ${saveData.filename}<br>
+                📍 ${saveData.stats?.point_count || 0}개 포인트<br>
+                📏 ${saveData.stats?.total_distance?.toFixed(1) || 0}m 이동<br>
+                🚪 방문: ${saveData.stats?.rooms_visited?.join(' → ') || '-'}
+            `;
+            document.getElementById('saveModal').classList.add('active');
+            
+            document.getElementById('trackingStatus').innerHTML = '⏸️ 저장 완료';
+        }
+        
+        // 데이터 초기화
+        async function clearData() {
+            trajectory = [];
+            document.getElementById('recordInfo').style.display = 'none';
+            document.getElementById('recordTime').textContent = '0.0';
+            document.getElementById('recordPoints').textContent = '0';
+            document.getElementById('recordRooms').textContent = '0';
+            
+            await fetch('/api/clear');
+            drawGraph();
+        }
+        
+        // 모달 닫기
+        function closeModal() {
+            document.getElementById('saveModal').classList.remove('active');
+        }
+        
+        // 분석 페이지로 이동
+        function goToAnalysis() {
+            closeModal();
+            // 파일명을 쿼리 파라미터로 전달
+            const filename = lastFilename?.split('/').pop();
+            window.location.href = `/analysis?file=${encodeURIComponent(filename || '')}`;
+        }
+        
+        // 네비 토글
+        function toggleNavi() {
+            naviEnabled = document.getElementById('naviToggle').checked;
+            document.getElementById('naviPanel').classList.toggle('active', naviEnabled);
+            
+            if (!naviEnabled) {
+                cancelNavi();
+            }
+        }
+        
+        // 목적지 설정
+        function setDestination(room) {
+            destination = room;
+            destPosition = ROOMS[room];
+            naviStartPosition = currentPosition;
+            
+            document.getElementById('naviGuidance').classList.add('active');
+            
+            // 버튼 스타일 업데이트
+            document.querySelectorAll('.room-btn').forEach(btn => {
+                btn.classList.remove('destination');
+            });
+            document.getElementById(`room-btn-${room}`)?.classList.add('destination');
+            
+            updateNavi();
+        }
+        
+        // 네비 취소
+        function cancelNavi() {
+            destination = null;
+            destPosition = null;
+            document.getElementById('naviGuidance').classList.remove('active');
+            document.querySelectorAll('.room-btn').forEach(btn => {
+                btn.classList.remove('destination');
+            });
+        }
+        
+        // 네비 업데이트
+        function updateNavi() {
+            if (!destination || destPosition === null) return;
+            
+            const distance = destPosition - currentPosition;
+            const absDistance = Math.abs(distance);
+            
+            const arrow = document.getElementById('naviArrow');
+            const text = document.getElementById('naviText');
+            
+            if (absDistance < 3) {
+                arrow.textContent = '🎉';
+                text.textContent = `${destination} 도착!`;
+                text.style.color = '#2ecc71';
+            } else if (distance > 0) {
+                arrow.textContent = '➡️';
+                text.textContent = '직진하세요 →';
+                text.style.color = '#fff';
+            } else {
+                arrow.textContent = '⬅️';
+                text.textContent = '← 뒤로 가세요';
+                text.style.color = '#fff';
+            }
+            
+            document.getElementById('naviDistance').textContent = absDistance.toFixed(1);
+            
+            // 진행률
+            const totalDist = Math.abs(destPosition - naviStartPosition);
+            const progress = totalDist > 0 ? ((totalDist - absDistance) / totalDist) * 100 : 0;
+            document.getElementById('naviProgress').style.width = Math.max(0, Math.min(100, progress)) + '%';
+        }
+        
+        // 맵 그리기
+        function drawMap() {
+            const w = mapCanvas.offsetWidth;
+            const h = mapCanvas.offsetHeight;
+            
+            mapCtx.clearRect(0, 0, w, h);
+            mapCtx.fillStyle = '#0a0a15';
+            mapCtx.fillRect(0, 0, w, h);
+            
+            const minX = -15;
+            const maxX = 75;
+            const toX = (pos) => ((pos - minX) / (maxX - minX)) * (w - 40) + 20;
+            
+            const corridorY = h / 2;
+            const corridorH = 50;
+            
+            // 복도
+            mapCtx.fillStyle = '#1a1a2e';
+            mapCtx.fillRect(toX(minX), corridorY - corridorH/2, toX(maxX) - toX(minX), corridorH);
+            
+            // 호실 표시
+            mapCtx.font = '10px sans-serif';
+            mapCtx.textAlign = 'center';
+            
+            Object.entries(ROOMS).forEach(([room, pos]) => {
+                const x = toX(pos);
+                
+                mapCtx.strokeStyle = '#333';
+                mapCtx.beginPath();
+                mapCtx.moveTo(x, corridorY - corridorH/2);
+                mapCtx.lineTo(x, corridorY + corridorH/2);
+                mapCtx.stroke();
+                
+                mapCtx.fillStyle = room === currentRoom ? '#00d4ff' : '#555';
+                mapCtx.fillText(room, x, corridorY - corridorH/2 - 5);
+            });
+            
+            // 원점 표시
+            mapCtx.fillStyle = '#ff0';
+            mapCtx.beginPath();
+            mapCtx.arc(toX(0), corridorY + corridorH/2 + 10, 4, 0, Math.PI * 2);
+            mapCtx.fill();
+            mapCtx.fillStyle = '#ff0';
+            mapCtx.font = '9px sans-serif';
+            mapCtx.fillText('원점', toX(0), corridorY + corridorH/2 + 22);
+            
+            // 목적지 표시
+            if (destPosition !== null) {
+                const dx = toX(destPosition);
+                mapCtx.fillStyle = '#e74c3c';
+                mapCtx.beginPath();
+                mapCtx.arc(dx, corridorY, 10, 0, Math.PI * 2);
+                mapCtx.fill();
+                mapCtx.fillStyle = '#fff';
+                mapCtx.fillText('🎯', dx, corridorY + 4);
+            }
+            
+            // 궤적
+            if (trajectory.length > 1) {
+                mapCtx.strokeStyle = 'rgba(0, 212, 255, 0.4)';
+                mapCtx.lineWidth = 3;
+                mapCtx.beginPath();
+                mapCtx.moveTo(toX(trajectory[0].position), corridorY);
+                trajectory.forEach(p => mapCtx.lineTo(toX(p.position), corridorY));
+                mapCtx.stroke();
+            }
+            
+            // 현재 위치
+            const cx = toX(currentPosition);
+            
+            // 글로우
+            const grad = mapCtx.createRadialGradient(cx, corridorY, 0, cx, corridorY, 25);
+            grad.addColorStop(0, 'rgba(0, 212, 255, 0.6)');
+            grad.addColorStop(1, 'rgba(0, 212, 255, 0)');
+            mapCtx.fillStyle = grad;
+            mapCtx.beginPath();
+            mapCtx.arc(cx, corridorY, 25, 0, Math.PI * 2);
+            mapCtx.fill();
+            
+            // 점
+            mapCtx.fillStyle = '#00d4ff';
+            mapCtx.beginPath();
+            mapCtx.arc(cx, corridorY, 10, 0, Math.PI * 2);
+            mapCtx.fill();
+            
+            mapCtx.fillStyle = '#fff';
+            mapCtx.beginPath();
+            mapCtx.arc(cx, corridorY, 5, 0, Math.PI * 2);
+            mapCtx.fill();
+        }
+        
+        // 그래프 그리기
+        function drawGraph() {
+            const w = graphCanvas.offsetWidth;
+            const h = graphCanvas.offsetHeight;
+            
+            graphCtx.clearRect(0, 0, w, h);
+            graphCtx.fillStyle = '#0a0a15';
+            graphCtx.fillRect(0, 0, w, h);
+            
+            if (trajectory.length < 2) {
+                graphCtx.fillStyle = '#555';
+                graphCtx.font = '14px sans-serif';
+                graphCtx.textAlign = 'center';
+                graphCtx.fillText('추적을 시작하면 그래프가 표시됩니다', w/2, h/2);
+                return;
+            }
+            
+            const padding = 40;
+            const gw = w - padding * 2;
+            const gh = h - padding * 2;
+            
+            const times = trajectory.map(p => p.time);
+            const positions = trajectory.map(p => p.position);
+            const maxTime = Math.max(...times, 10);
+            const minPos = Math.min(...positions, -10);
+            const maxPos = Math.max(...positions, 70);
+            
+            // 축
+            graphCtx.strokeStyle = '#333';
+            graphCtx.beginPath();
+            graphCtx.moveTo(padding, padding);
+            graphCtx.lineTo(padding, h - padding);
+            graphCtx.lineTo(w - padding, h - padding);
+            graphCtx.stroke();
+            
+            // 라벨
+            graphCtx.fillStyle = '#666';
+            graphCtx.font = '10px sans-serif';
+            graphCtx.textAlign = 'right';
+            graphCtx.fillText(`${maxPos.toFixed(0)}m`, padding - 5, padding + 10);
+            graphCtx.fillText(`${minPos.toFixed(0)}m`, padding - 5, h - padding);
+            
+            // 그래프
+            graphCtx.strokeStyle = '#00d4ff';
+            graphCtx.lineWidth = 2;
+            graphCtx.beginPath();
+            
+            trajectory.forEach((p, i) => {
+                const x = padding + (p.time / maxTime) * gw;
+                const y = h - padding - ((p.position - minPos) / (maxPos - minPos)) * gh;
+                
+                if (i === 0) graphCtx.moveTo(x, y);
+                else graphCtx.lineTo(x, y);
+            });
+            graphCtx.stroke();
+        }
+        
+        // 상태 업데이트
+        async function updateStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                
+                currentPosition = data.position;
+                currentRoom = data.room;
+                
+                // UI 업데이트
+                document.getElementById('rssiValue').textContent = data.rssi;
+                document.getElementById('roomValue').textContent = data.room;
+                
+                // Fingerprinting 정보
+                if (data.method === 'fingerprint') {
+                    document.getElementById('methodValue').textContent = '🎯 FP';
+                    document.getElementById('methodValue').style.color = '#2ecc71';
+                    document.getElementById('confidenceValue').textContent = 
+                        Math.round(data.fingerprint.confidence * 100) + '%';
+                } else {
+                    document.getElementById('methodValue').textContent = '📶 RSSI';
+                    document.getElementById('methodValue').style.color = '#f39c12';
+                    document.getElementById('confidenceValue').textContent = '-';
+                }
+                
+                // 호실 버튼 업데이트
+                document.querySelectorAll('.room-btn').forEach(btn => {
+                    btn.classList.remove('current');
+                });
+                document.getElementById(`room-btn-${currentRoom}`)?.classList.add('current');
+                
+                // 추적 중이면 궤적 추가
+                if (isTracking && startTime) {
+                    const elapsed = (Date.now() - startTime) / 1000;
+                    trajectory.push({
+                        time: elapsed,
+                        position: data.position,
+                        room: data.room,
+                        rssi: data.rssi
+                    });
+                    
+                    // 기록 정보 업데이트
+                    document.getElementById('recordTime').textContent = elapsed.toFixed(1);
+                    document.getElementById('recordPoints').textContent = trajectory.length;
+                    document.getElementById('recordRooms').textContent = 
+                        [...new Set(trajectory.map(p => p.room))].length;
+                }
+                
+                // 네비 업데이트
+                if (naviEnabled && destination) {
+                    updateNavi();
+                }
+                
+                // 그리기
+                drawMap();
+                drawGraph();
+                
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+        
+        // 초기화
+        createRoomButtons();
+        drawMap();
+        drawGraph();
+        
+        // 주기적 업데이트
+        setInterval(updateStatus, 500);
+    </script>
+</body>
+</html>

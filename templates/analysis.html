@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📊 실내 위치 추적 분석 리포트</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        /* 헤더 */
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 30px;
+            background: linear-gradient(135deg, #00d4ff22, #00d4ff11);
+            border-radius: 20px;
+            border: 1px solid #00d4ff44;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            color: #888;
+        }
+        
+        /* 파일 선택 */
+        .file-selector {
+            background: rgba(255,255,255,0.05);
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .file-selector select {
+            flex: 1;
+            min-width: 200px;
+            padding: 12px 15px;
+            border-radius: 10px;
+            border: 2px solid #333;
+            background: #1a1a2e;
+            color: #fff;
+            font-size: 1rem;
+        }
+        
+        .file-selector button {
+            padding: 12px 30px;
+            border-radius: 10px;
+            border: none;
+            background: linear-gradient(135deg, #00d4ff, #0099cc);
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .file-selector button:hover {
+            transform: scale(1.05);
+        }
+        
+        /* 통계 카드 */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #1a1a3e, #2a2a5e);
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+            border: 1px solid #333;
+        }
+        
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+        
+        .stat-label {
+            color: #888;
+            margin-top: 5px;
+            font-size: 0.9rem;
+        }
+        
+        .stat-card.highlight {
+            border-color: #00d4ff;
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+        }
+        
+        /* 차트 영역 */
+        .charts-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .chart-card {
+            background: rgba(255,255,255,0.03);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid #333;
+        }
+        
+        .chart-card h3 {
+            margin-bottom: 15px;
+            color: #00d4ff;
+            font-size: 1.1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .chart-card h3 button {
+            padding: 5px 10px;
+            font-size: 0.8rem;
+            border: none;
+            border-radius: 5px;
+            background: #3498db;
+            color: #fff;
+            cursor: pointer;
+        }
+        
+        .chart-card h3 button:hover {
+            background: #2980b9;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+        
+        /* 히트맵 */
+        .heatmap-section {
+            background: rgba(255,255,255,0.03);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 1px solid #333;
+        }
+        
+        .heatmap-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            overflow-x: auto;
+            padding: 20px 0;
+        }
+        
+        .heatmap-room {
+            min-width: 70px;
+            height: 80px;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        
+        .heatmap-room span {
+            font-size: 0.8rem;
+            margin-top: 5px;
+        }
+        
+        /* 타임라인 */
+        .timeline-section {
+            background: rgba(255,255,255,0.03);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 1px solid #333;
+        }
+        
+        .timeline {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .timeline-item {
+            background: linear-gradient(135deg, #2a2a5e, #3a3a7e);
+            padding: 10px 15px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+        }
+        
+        .timeline-item .time {
+            color: #00d4ff;
+            font-weight: bold;
+        }
+        
+        /* 오차 분석 */
+        .error-section {
+            background: rgba(255,255,255,0.03);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 1px solid #333;
+        }
+        
+        .error-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .error-item {
+            background: #1a1a3e;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .error-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+        }
+        
+        .error-value.good { color: #2ecc71; }
+        .error-value.medium { color: #f39c12; }
+        .error-value.bad { color: #e74c3c; }
+        
+        /* 데이터 테이블 */
+        .data-section {
+            background: rgba(255,255,255,0.03);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 1px solid #333;
+        }
+        
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        
+        .data-table th, .data-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #333;
+        }
+        
+        .data-table th {
+            background: #1a1a3e;
+            color: #00d4ff;
+        }
+        
+        .data-table tr:hover {
+            background: rgba(0, 212, 255, 0.1);
+        }
+        
+        /* 복도 시각화 */
+        .corridor-visual {
+            background: #0a0a15;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 15px;
+            position: relative;
+            height: 120px;
+        }
+        
+        .corridor-track {
+            position: absolute;
+            top: 50%;
+            left: 5%;
+            right: 5%;
+            height: 40px;
+            background: #1a1a2e;
+            border-radius: 8px;
+            transform: translateY(-50%);
+        }
+        
+        .corridor-point {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: #00d4ff;
+            border-radius: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            opacity: 0.6;
+        }
+        
+        .corridor-labels {
+            position: absolute;
+            bottom: 10px;
+            left: 5%;
+            right: 5%;
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.7rem;
+            color: #666;
+        }
+        
+        /* 내보내기 버튼 */
+        .export-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+        
+        .export-btn {
+            padding: 15px 30px;
+            border-radius: 10px;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .export-btn.json { background: #3498db; color: #fff; }
+        .export-btn.csv { background: #2ecc71; color: #fff; }
+        .export-btn.png { background: #9b59b6; color: #fff; }
+        
+        /* 로딩 */
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #888;
+        }
+        
+        /* 반응형 */
+        @media (max-width: 768px) {
+            .charts-section {
+                grid-template-columns: 1fr;
+            }
+            
+            .chart-card {
+                min-width: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 헤더 -->
+        <div class="header">
+            <h1>📊 실내 위치 추적 분석 리포트</h1>
+            <p>WiFi RSSI 기반 실내 항법 시스템 - 한림대학교 자연과학관 4층</p>
+        </div>
+        
+        <!-- 파일 선택 -->
+        <div class="file-selector">
+            <select id="fileSelect">
+                <option value="">-- 분석할 파일 선택 --</option>
+            </select>
+            <button onclick="loadAndAnalyze()">📈 분석 시작</button>
+            <button onclick="location.href='/'" style="background: #666;">← 추적 페이지</button>
+            <button onclick="location.href='/navi'" style="background: #9b59b6;">🧭 네비게이션</button>
+        </div>
+        
+        <!-- 분석 결과 (로드 후 표시) -->
+        <div id="analysisResult" style="display: none;">
+            
+            <!-- 기본 통계 -->
+            <div class="stats-grid">
+                <div class="stat-card highlight">
+                    <div class="stat-value" id="statDuration">0</div>
+                    <div class="stat-label">⏱️ 총 추적 시간 (초)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statPoints">0</div>
+                    <div class="stat-label">📍 기록 포인트</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statDistance">0</div>
+                    <div class="stat-label">📏 이동 거리 (m)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statSpeed">0</div>
+                    <div class="stat-label">🚶 평균 속도 (m/s)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statRooms">0</div>
+                    <div class="stat-label">🚪 방문 호실 수</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statAvgRssi">0</div>
+                    <div class="stat-label">📶 평균 RSSI (dBm)</div>
+                </div>
+            </div>
+            
+            <!-- 메인 차트 -->
+            <div class="charts-section">
+                <div class="chart-card">
+                    <h3>📈 시간에 따른 위치 변화 <button onclick="saveChart('positionChart', 'position_chart')">💾 저장</button></h3>
+                    <div class="chart-container">
+                        <canvas id="positionChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>📶 RSSI 신호 강도 변화 <button onclick="saveChart('rssiChart', 'rssi_chart')">💾 저장</button></h3>
+                    <div class="chart-container">
+                        <canvas id="rssiChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="charts-section">
+                <div class="chart-card">
+                    <h3>🚶 이동 속도 변화 <button onclick="saveChart('speedChart', 'speed_chart')">💾 저장</button></h3>
+                    <div class="chart-container">
+                        <canvas id="speedChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>🚪 호실별 체류 시간 <button onclick="saveChart('roomChart', 'room_chart')">💾 저장</button></h3>
+                    <div class="chart-container">
+                        <canvas id="roomChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 복도 히트맵 -->
+            <div class="heatmap-section">
+                <h3>🔥 복도 히트맵 (체류 시간 기반)</h3>
+                <div class="heatmap-container" id="heatmapContainer"></div>
+                
+                <h3 style="margin-top: 20px;">🗺️ 이동 궤적 시각화</h3>
+                <div class="corridor-visual">
+                    <div class="corridor-track" id="corridorTrack"></div>
+                    <div class="corridor-labels">
+                        <span>7414</span>
+                        <span>7413</span>
+                        <span>7412</span>
+                        <span>7411</span>
+                        <span>7408</span>
+                        <span>7405</span>
+                        <span>7401</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 오차 분석 -->
+            <div class="error-section">
+                <h3>📐 위치 추정 오차 분석</h3>
+                <div class="error-grid">
+                    <div class="error-item">
+                        <div class="error-value good" id="errorAvg">±2.5</div>
+                        <div class="stat-label">평균 오차 (m)</div>
+                    </div>
+                    <div class="error-item">
+                        <div class="error-value" id="errorMax">±5.0</div>
+                        <div class="stat-label">최대 오차 (m)</div>
+                    </div>
+                    <div class="error-item">
+                        <div class="error-value" id="errorStd">1.2</div>
+                        <div class="stat-label">표준편차 (m)</div>
+                    </div>
+                    <div class="error-item">
+                        <div class="error-value good" id="errorAccuracy">85%</div>
+                        <div class="stat-label">호실 정확도</div>
+                    </div>
+                </div>
+                <p style="margin-top: 15px; color: #888; font-size: 0.9rem;">
+                    * 오차는 RSSI 신호 변동성 기반 추정값입니다. 실제 측정을 위해서는 Ground Truth 데이터가 필요합니다.
+                </p>
+            </div>
+            
+            <!-- 타임라인 -->
+            <div class="timeline-section">
+                <h3>🕐 이동 타임라인</h3>
+                <div class="timeline" id="timeline"></div>
+            </div>
+            
+            <!-- 원시 데이터 -->
+            <div class="data-section">
+                <h3>📋 원시 데이터 (최근 20개)</h3>
+                <div style="overflow-x: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>시간 (초)</th>
+                                <th>RSSI (dBm)</th>
+                                <th>위치 (m)</th>
+                                <th>호실</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dataTable"></tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- 내보내기 -->
+            <div class="export-buttons">
+                <button class="export-btn json" onclick="downloadJSON()">📥 JSON 다운로드</button>
+                <button class="export-btn csv" onclick="downloadCSV()">📥 CSV 다운로드</button>
+                <button class="export-btn png" onclick="saveAllCharts()">📊 모든 그래프 저장</button>
+                <button class="export-btn" style="background:#9b59b6;" onclick="captureReport()">📸 전체 캡처</button>
+            </div>
+        </div>
+        
+        <!-- 로딩/안내 -->
+        <div id="loadingSection" class="loading">
+            <p>📂 분석할 파일을 선택하세요</p>
+        </div>
+    </div>
+    
+    <script>
+        let currentData = null;
+        let charts = {};
+        
+        // 파일 목록 로드
+        async function loadFileList() {
+            try {
+                const response = await fetch('/api/list');
+                const data = await response.json();
+                
+                const select = document.getElementById('fileSelect');
+                select.innerHTML = '<option value="">-- 분석할 파일 선택 --</option>';
+                
+                data.files.forEach(f => {
+                    const option = document.createElement('option');
+                    option.value = f.filename;
+                    option.textContent = `${f.filename} (${f.modified})`;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading file list:', error);
+            }
+        }
+        
+        // 파일 로드 및 분석
+        async function loadAndAnalyze() {
+            const filename = document.getElementById('fileSelect').value;
+            if (!filename) {
+                alert('파일을 선택하세요!');
+                return;
+            }
+            
+            try {
+                document.getElementById('loadingSection').innerHTML = '<p>⏳ 분석 중...</p>';
+                
+                const response = await fetch(`/api/load/${filename}`);
+                currentData = await response.json();
+                
+                analyzeData(currentData);
+                
+                document.getElementById('loadingSection').style.display = 'none';
+                document.getElementById('analysisResult').style.display = 'block';
+                
+            } catch (error) {
+                alert('파일 로드 실패: ' + error);
+            }
+        }
+        
+        // 데이터 분석
+        function analyzeData(data) {
+            const trajectory = data.trajectory || [];
+            if (trajectory.length === 0) {
+                alert('궤적 데이터가 없습니다!');
+                return;
+            }
+            
+            // 기본 통계
+            const duration = trajectory[trajectory.length - 1].time;
+            const positions = trajectory.map(p => p.position);
+            const rssis = trajectory.map(p => p.rssi);
+            const rooms = [...new Set(trajectory.map(p => p.room))];
+            
+            // 이동 거리 계산
+            let totalDistance = 0;
+            for (let i = 1; i < positions.length; i++) {
+                totalDistance += Math.abs(positions[i] - positions[i-1]);
+            }
+            
+            // 통계 표시
+            document.getElementById('statDuration').textContent = duration.toFixed(1);
+            document.getElementById('statPoints').textContent = trajectory.length;
+            document.getElementById('statDistance').textContent = totalDistance.toFixed(1);
+            document.getElementById('statSpeed').textContent = (totalDistance / duration).toFixed(2);
+            document.getElementById('statRooms').textContent = rooms.length;
+            document.getElementById('statAvgRssi').textContent = (rssis.reduce((a,b) => a+b, 0) / rssis.length).toFixed(0);
+            
+            // 오차 추정 (RSSI 변동성 기반)
+            const rssiStd = standardDeviation(rssis);
+            const estimatedError = rssiStd * 0.5; // 대략적 변환
+            const posStd = standardDeviation(positions);
+            
+            document.getElementById('errorAvg').textContent = `±${estimatedError.toFixed(1)}`;
+            document.getElementById('errorMax').textContent = `±${(estimatedError * 2).toFixed(1)}`;
+            document.getElementById('errorStd').textContent = posStd.toFixed(1);
+            
+            // 호실 정확도 (연속성 기반 추정)
+            let consistentCount = 0;
+            for (let i = 1; i < trajectory.length; i++) {
+                if (trajectory[i].room === trajectory[i-1].room || 
+                    Math.abs(positions[i] - positions[i-1]) < 5) {
+                    consistentCount++;
+                }
+            }
+            const accuracy = (consistentCount / (trajectory.length - 1) * 100).toFixed(0);
+            document.getElementById('errorAccuracy').textContent = accuracy + '%';
+            
+            // 차트 생성
+            createPositionChart(trajectory);
+            createRssiChart(trajectory);
+            createSpeedChart(trajectory);
+            createRoomChart(trajectory);
+            
+            // 히트맵
+            createHeatmap(trajectory);
+            
+            // 궤적 시각화
+            createCorridorVisualization(trajectory);
+            
+            // 타임라인
+            createTimeline(trajectory);
+            
+            // 데이터 테이블
+            createDataTable(trajectory);
+        }
+        
+        // 표준편차 계산
+        function standardDeviation(arr) {
+            const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
+            const squareDiffs = arr.map(value => Math.pow(value - mean, 2));
+            return Math.sqrt(squareDiffs.reduce((a, b) => a + b, 0) / arr.length);
+        }
+        
+        // 위치 차트
+        function createPositionChart(trajectory) {
+            const ctx = document.getElementById('positionChart').getContext('2d');
+            
+            if (charts.position) charts.position.destroy();
+            
+            charts.position = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: trajectory.map(p => p.time.toFixed(1) + 's'),
+                    datasets: [{
+                        label: '위치 (m from 7413)',
+                        data: trajectory.map(p => p.position),
+                        borderColor: '#00d4ff',
+                        backgroundColor: 'rgba(0, 212, 255, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: '#fff' } }
+                    },
+                    scales: {
+                        x: { 
+                            ticks: { color: '#888', maxTicksLimit: 10 },
+                            grid: { color: '#333' }
+                        },
+                        y: { 
+                            ticks: { color: '#888' },
+                            grid: { color: '#333' }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // RSSI 차트
+        function createRssiChart(trajectory) {
+            const ctx = document.getElementById('rssiChart').getContext('2d');
+            
+            if (charts.rssi) charts.rssi.destroy();
+            
+            charts.rssi = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: trajectory.map(p => p.time.toFixed(1) + 's'),
+                    datasets: [{
+                        label: 'RSSI (dBm)',
+                        data: trajectory.map(p => p.rssi),
+                        borderColor: '#ff6384',
+                        backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: '#fff' } }
+                    },
+                    scales: {
+                        x: { 
+                            ticks: { color: '#888', maxTicksLimit: 10 },
+                            grid: { color: '#333' }
+                        },
+                        y: { 
+                            ticks: { color: '#888' },
+                            grid: { color: '#333' },
+                            reverse: true // RSSI는 높을수록 좋으므로
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 속도 차트
+        function createSpeedChart(trajectory) {
+            const ctx = document.getElementById('speedChart').getContext('2d');
+            
+            if (charts.speed) charts.speed.destroy();
+            
+            // 속도 계산
+            const speeds = [0];
+            for (let i = 1; i < trajectory.length; i++) {
+                const dt = trajectory[i].time - trajectory[i-1].time;
+                const dx = Math.abs(trajectory[i].position - trajectory[i-1].position);
+                speeds.push(dt > 0 ? dx / dt : 0);
+            }
+            
+            charts.speed = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: trajectory.map(p => p.time.toFixed(1) + 's'),
+                    datasets: [{
+                        label: '속도 (m/s)',
+                        data: speeds,
+                        borderColor: '#2ecc71',
+                        backgroundColor: 'rgba(46, 204, 113, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: '#fff' } }
+                    },
+                    scales: {
+                        x: { 
+                            ticks: { color: '#888', maxTicksLimit: 10 },
+                            grid: { color: '#333' }
+                        },
+                        y: { 
+                            ticks: { color: '#888' },
+                            grid: { color: '#333' },
+                            min: 0
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 호실별 체류 시간 차트
+        function createRoomChart(trajectory) {
+            const ctx = document.getElementById('roomChart').getContext('2d');
+            
+            if (charts.room) charts.room.destroy();
+            
+            // 호실별 체류 시간 계산
+            const roomTime = {};
+            for (let i = 1; i < trajectory.length; i++) {
+                const room = trajectory[i].room;
+                const dt = trajectory[i].time - trajectory[i-1].time;
+                roomTime[room] = (roomTime[room] || 0) + dt;
+            }
+            
+            const sortedRooms = Object.entries(roomTime).sort((a, b) => b[1] - a[1]);
+            
+            charts.room = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: sortedRooms.map(r => r[0]),
+                    datasets: [{
+                        data: sortedRooms.map(r => r[1].toFixed(1)),
+                        backgroundColor: [
+                            '#00d4ff', '#ff6384', '#ffce56', '#2ecc71', 
+                            '#9b59b6', '#e74c3c', '#3498db', '#1abc9c'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { 
+                            position: 'right',
+                            labels: { color: '#fff' } 
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 히트맵 생성
+        function createHeatmap(trajectory) {
+            const container = document.getElementById('heatmapContainer');
+            container.innerHTML = '';
+            
+            const rooms = ['7414', '7413', '7412', '7411', '7410', '7409', '7408', '7407', '7406', '7405', '7404', '7403', '7401'];
+            
+            // 호실별 체류 시간 계산
+            const roomTime = {};
+            for (let i = 1; i < trajectory.length; i++) {
+                const room = trajectory[i].room;
+                const dt = trajectory[i].time - trajectory[i-1].time;
+                roomTime[room] = (roomTime[room] || 0) + dt;
+            }
+            
+            const maxTime = Math.max(...Object.values(roomTime), 1);
+            
+            rooms.forEach(room => {
+                const time = roomTime[room] || 0;
+                const intensity = time / maxTime;
+                
+                const div = document.createElement('div');
+                div.className = 'heatmap-room';
+                div.style.background = `rgba(255, ${Math.floor(100 - intensity * 100)}, ${Math.floor(50 - intensity * 50)}, ${0.3 + intensity * 0.7})`;
+                div.innerHTML = `${room}<span>${time.toFixed(1)}s</span>`;
+                
+                container.appendChild(div);
+            });
+        }
+        
+        // 복도 시각화
+        function createCorridorVisualization(trajectory) {
+            const track = document.getElementById('corridorTrack');
+            
+            // 기존 점들 제거
+            track.querySelectorAll('.corridor-point').forEach(p => p.remove());
+            
+            // 위치 범위
+            const minPos = -10;
+            const maxPos = 70;
+            const range = maxPos - minPos;
+            
+            // 점 추가 (샘플링)
+            const step = Math.max(1, Math.floor(trajectory.length / 100));
+            for (let i = 0; i < trajectory.length; i += step) {
+                const point = trajectory[i];
+                const pct = ((point.position - minPos) / range) * 100;
+                
+                const dot = document.createElement('div');
+                dot.className = 'corridor-point';
+                dot.style.left = pct + '%';
+                dot.style.opacity = 0.3 + (i / trajectory.length) * 0.7;
+                
+                track.appendChild(dot);
+            }
+        }
+        
+        // 타임라인
+        function createTimeline(trajectory) {
+            const container = document.getElementById('timeline');
+            container.innerHTML = '';
+            
+            // 호실 변경 이벤트 추출
+            let lastRoom = null;
+            trajectory.forEach(point => {
+                if (point.room !== lastRoom) {
+                    const item = document.createElement('div');
+                    item.className = 'timeline-item';
+                    item.innerHTML = `<span class="time">${point.time.toFixed(1)}s</span> → ${point.room}`;
+                    container.appendChild(item);
+                    lastRoom = point.room;
+                }
+            });
+        }
+        
+        // 데이터 테이블
+        function createDataTable(trajectory) {
+            const tbody = document.getElementById('dataTable');
+            tbody.innerHTML = '';
+            
+            // 최근 20개만
+            const recent = trajectory.slice(-20);
+            
+            recent.forEach((point, i) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${trajectory.length - 20 + i + 1}</td>
+                    <td>${point.time.toFixed(1)}</td>
+                    <td>${point.rssi}</td>
+                    <td>${point.position.toFixed(1)}</td>
+                    <td>${point.room}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+        
+        // JSON 다운로드
+        function downloadJSON() {
+            if (!currentData) return;
+            
+            const blob = new Blob([JSON.stringify(currentData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'tracking_data.json';
+            a.click();
+        }
+        
+        // CSV 다운로드
+        function downloadCSV() {
+            if (!currentData) return;
+            
+            const trajectory = currentData.trajectory || [];
+            let csv = 'time,rssi,position,room\n';
+            trajectory.forEach(p => {
+                csv += `${p.time},${p.rssi},${p.position},${p.room}\n`;
+            });
+            
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'tracking_data.csv';
+            a.click();
+        }
+        
+        // 리포트 캡처
+        function captureReport() {
+            alert('브라우저의 인쇄 기능(Cmd+P)을 사용하여 PDF로 저장하세요!');
+            window.print();
+        }
+        
+        // 개별 차트 저장
+        function saveChart(chartId, filename) {
+            const canvas = document.getElementById(chartId);
+            const link = document.createElement('a');
+            link.download = `${filename}_${new Date().toISOString().slice(0,10)}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            alert(`✅ ${filename}.png 저장 완료!`);
+        }
+        
+        // 모든 차트 저장
+        function saveAllCharts() {
+            ['positionChart', 'rssiChart', 'speedChart', 'roomChart'].forEach((id, i) => {
+                setTimeout(() => {
+                    const names = ['position', 'rssi', 'speed', 'room'];
+                    saveChart(id, names[i] + '_chart');
+                }, i * 500);
+            });
+        }
+        
+        // 초기화
+        loadFileList();
+        
+        // URL 파라미터로 파일 자동 로드
+        const urlParams = new URLSearchParams(window.location.search);
+        const fileParam = urlParams.get('file');
+        if (fileParam) {
+            setTimeout(() => {
+                document.getElementById('fileSelect').value = fileParam;
+                loadAndAnalyze();
+            }, 500);
+        }
+    </script>
+</body>
+</html>
